@@ -25,7 +25,6 @@ import java.io.File
 import java.io.FileOutputStream
 import java.io.OutputStream
 
-/** SocialShareProPlugin */
 class SocialShareProPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
 
     private lateinit var channel: MethodChannel
@@ -148,50 +147,38 @@ class SocialShareProPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
 
     // --- WHATSAPP ---
     private fun handleWhatsAppShare(call: MethodCall, result: Result) {
-        // Check if WhatsApp is installed
-        guard let whatsappURL = URL(string: WhatsAppSharePlugin.WHATSAPP_URL_SCHEME),
-        UIApplication.shared.canOpenURL(whatsappURL) else {
-            result(FlutterError(code: "WHATSAPP_NOT_INSTALLED",
-                message: "WhatsApp is not installed",
-            details: nil))
+        if (!isPackageInstalled(WHATSAPP_PACKAGE)) {
+            result.error("WHATSAPP_NOT_INSTALLED", "WhatsApp is not installed", null)
             return
         }
 
-        guard let args = call.arguments as? [String: Any],
-        let imagePath = args["imagePath"] as? String else {
-            result(FlutterError(code: "INVALID_ARGUMENTS",
-                message: "Image path is required",
-            details: nil))
+        val imagePath = call.argument<String>("imagePath")
+        if (imagePath == null) {
+            result.error("INVALID_ARGUMENTS", "Image path is required", null)
             return
         }
 
-        // Get the image URL
-        let imageURL: URL
-                if imagePath.hasPrefix("file://") {
-                    imageURL = URL(string: imagePath)!
-                } else {
-                    imageURL = URL(fileURLWithPath: imagePath)
-                }
-
-        // Verify file exists
-        guard FileManager.default.fileExists(atPath: imageURL.path) else {
-            result(FlutterError(code: "FILE_NOT_FOUND",
-                message: "Image file not found at path: \(imagePath)",
-            details: nil))
-            return
-        }
-
-        // Load the image
-        guard let imageData = try? Data(contentsOf: imageURL),
-            let image = UIImage(data: imageData) else {
-                result(FlutterError(code: "INVALID_IMAGE",
-                    message: "Failed to load image",
-                details: nil))
+        try {
+            val imageFile = File(imagePath)
+            if (!imageFile.exists()) {
+                result.error("FILE_NOT_FOUND", "Image file not found at path: $imagePath", null)
                 return
             }
 
-            // Method 1: Try Document Interaction Controller (direct to WhatsApp)
-            shareViaDocumentInteraction(image: image, imageURL: imageURL, result: result)
+            val imageUri = getUriForFile(imagePath)
+
+            val intent = Intent(Intent.ACTION_SEND).apply {
+                type = "image/*"
+                setPackage(WHATSAPP_PACKAGE)
+                putExtra(Intent.EXTRA_STREAM, imageUri)
+                flags = Intent.FLAG_GRANT_READ_URI_PERMISSION
+            }
+
+            activity?.grantUriPermission(WHATSAPP_PACKAGE, imageUri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            startActivity(intent, result)
+        } catch (e: Exception) {
+            result.error("SHARE_FAILED", e.message, null)
+        }
     }
 
     // --- SAVE TO GALLERY ---
