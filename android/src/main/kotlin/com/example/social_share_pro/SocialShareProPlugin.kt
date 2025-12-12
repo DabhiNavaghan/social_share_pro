@@ -12,6 +12,7 @@ import android.net.Uri
 import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
+import android.util.Log
 import androidx.annotation.NonNull
 import androidx.core.content.FileProvider
 import io.flutter.embedding.engine.plugins.FlutterPlugin
@@ -45,7 +46,16 @@ class SocialShareProPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
         when (call.method) {
             "shareToInstagramStories" -> handleInstagramShare(call, result)
             "shareToFacebookStories" -> handleFacebookShare(call, result)
-            "shareToWhatsAppStatus" -> shareToWhatsAppStatus(call, result)
+            "shareToWhatsAppStatus" -> {
+                val imagePath = call.argument<String>("imagePath")
+
+                if (imagePath == null) {
+                    result.error("INVALID_ARGUMENTS", "Image path is required", null)
+                    return
+                }
+
+                shareToWhatsAppStatus(imagePath, result)
+            }
             "saveToGallery" -> handleSaveToGallery(call, result)
             "isInstagramInstalled" -> result.success(isPackageInstalled(INSTAGRAM_PACKAGE))
             "isFacebookInstalled" -> result.success(isPackageInstalled(FACEBOOK_PACKAGE))
@@ -146,10 +156,9 @@ class SocialShareProPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
     }
 
     // --- WHATSAPP ---
-    private fun shareToWhatsAppStatus(call: MethodCall, result: MethodChannel.Result) {
-        val imagePath = call.argument<String>("imagePath")
-        if (imagePath == null) {
-            result.error("INVALID_ARGUMENTS", "Image path is required", null)
+    private fun shareToWhatsAppStatus(imagePath: String,result: MethodChannel.Result) {
+        if (activity == null) {
+            result.error("ACTIVITY_NOT_AVAILABLE", "Activity is not available", null)
             return
         }
 
@@ -159,78 +168,45 @@ class SocialShareProPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
         }
 
         try {
-            val imageFile = File(imagePath)
-            if (!imageFile.exists()) {
-                result.error("FILE_NOT_FOUND", "Image file does not exist", null)
-                return
-            }
-
-            val imageUri: Uri = FileProvider.getUriForFile(
-                activity!!,
-                "${activity!!.packageName}.fileprovider",
-                imageFile
-            )
+            val imageUri: Uri = getUriForFile(imagePath)
 
             activity!!.grantUriPermission(
                 WHATSAPP_PACKAGE,
                 imageUri,
                 Intent.FLAG_GRANT_READ_URI_PERMISSION
             )
-
-            // Try multiple approaches to share to WhatsApp Status
-            // Approach 1: Use ContactPicker with status target
-            try {
-                val statusIntent = Intent().apply {
-                    action = Intent.ACTION_SEND
-                    type = "image/*"
-                    flags = Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK
-                    putExtra(Intent.EXTRA_STREAM, imageUri)
-                    putExtra("jid", "status@broadcast")
-                    component = ComponentName(WHATSAPP_PACKAGE, "com.whatsapp.ContactPicker")
-                }
-                
-                if (activity!!.packageManager.resolveActivity(statusIntent, 0) != null) {
-                    activity!!.startActivity(statusIntent)
-                    result.success(true)
-                    return
-                }
-            } catch (e: Exception) {
-                // Continue to next approach
-            }
-
-            // Approach 2: Try StatusRecorderActivity (if available)
-            try {
-                val statusRecorderIntent = Intent().apply {
-                    action = Intent.ACTION_SEND
-                    type = "image/*"
-                    flags = Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK
-                    putExtra(Intent.EXTRA_STREAM, imageUri)
-                    component = ComponentName(WHATSAPP_PACKAGE, "com.whatsapp.StatusRecorderActivity")
-                }
-                
-                if (activity!!.packageManager.resolveActivity(statusRecorderIntent, 0) != null) {
-                    activity!!.startActivity(statusRecorderIntent)
-                    result.success(true)
-                    return
-                }
-            } catch (e: Exception) {
-                // Continue to next approach
-            }
-
-            // Approach 3: Use standard share with WhatsApp package (opens share sheet, user can select Status)
-            val fallbackIntent = Intent().apply {
+            val statusIntent = Intent().apply {
                 action = Intent.ACTION_SEND
                 type = "image/*"
                 flags = Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK
-                setPackage(WHATSAPP_PACKAGE)
                 putExtra(Intent.EXTRA_STREAM, imageUri)
+                // Target status broadcast (this tells WhatsApp to open status)
+                putExtra("jid", "status@broadcast")
+                // Set WhatsApp's status activity directly
+                component = ComponentName(WHATSAPP_PACKAGE, "com.whatsapp.ContactPicker")
             }
-            
-            activity!!.startActivity(fallbackIntent)
-            result.success(true)
+
+            try {
+                Log.d("SocialSharePro", "Attempting to start WhatsApp status intent with component.")
+                activity!!.startActivity(statusIntent)
+                result.success(true)
+            } catch (e: Exception) {
+                // Fallback: try without component
+                val fallbackIntent = Intent().apply {
+                    action = Intent.ACTION_SEND
+                    type = "image/*"
+                    flags = Intent.FLAG_GRANT_READ_URI_PERMISSION
+                    setPackage(WHATSAPP_PACKAGE)
+                    putExtra(Intent.EXTRA_STREAM, imageUri)
+                    putExtra("jid", "status@broadcast")
+                }
+                Log.d("SocialSharePro", "Failed to start WhatsApp status intent with component, trying fallback. Error: ${e.message}")
+                activity!!.startActivity(fallbackIntent)
+                result.success(true)
+            }
 
         } catch (e: Exception) {
-            result.error("SHARE_FAILED", e.message ?: "Unknown error occurred", null)
+            result.error("SHARE_FAILED", e.message, null)
         }
     }
 
