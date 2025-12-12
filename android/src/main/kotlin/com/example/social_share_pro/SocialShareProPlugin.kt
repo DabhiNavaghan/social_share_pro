@@ -148,42 +148,50 @@ class SocialShareProPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
 
     // --- WHATSAPP ---
     private fun handleWhatsAppShare(call: MethodCall, result: Result) {
-        if (!isPackageInstalled(WHATSAPP_PACKAGE)) {
-            result.error("WHATSAPP_NOT_INSTALLED", "WhatsApp is not installed", null)
+        // Check if WhatsApp is installed
+        guard let whatsappURL = URL(string: WhatsAppSharePlugin.WHATSAPP_URL_SCHEME),
+        UIApplication.shared.canOpenURL(whatsappURL) else {
+            result(FlutterError(code: "WHATSAPP_NOT_INSTALLED",
+                message: "WhatsApp is not installed",
+            details: nil))
             return
         }
 
-        val imagePath = call.argument<String>("imagePath")
-        if (imagePath == null) {
-            result.error("INVALID_ARGUMENTS", "Image path is required", null)
+        guard let args = call.arguments as? [String: Any],
+        let imagePath = args["imagePath"] as? String else {
+            result(FlutterError(code: "INVALID_ARGUMENTS",
+                message: "Image path is required",
+            details: nil))
             return
         }
 
-        try {
-            val imageUri = getUriForFile(imagePath)
-            activity?.grantUriPermission(WHATSAPP_PACKAGE, imageUri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        // Get the image URL
+        let imageURL: URL
+                if imagePath.hasPrefix("file://") {
+                    imageURL = URL(string: imagePath)!
+                } else {
+                    imageURL = URL(fileURLWithPath: imagePath)
+                }
 
-            val intent = Intent(Intent.ACTION_SEND).apply {
-                type = "image/*"
-                flags = Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK
-                putExtra(Intent.EXTRA_STREAM, imageUri)
-                putExtra("jid", "status@broadcast") // Target status
-                setPackage(WHATSAPP_PACKAGE)
-            }
-
-            // Try specific component first (ContactPicker) as in original code
-            try {
-                intent.component = ComponentName(WHATSAPP_PACKAGE, "com.whatsapp.ContactPicker")
-                activity?.startActivity(intent)
-                result.success(true)
-            } catch (e: Exception) {
-                // Fallback to general share with package set
-                intent.component = null
-                startActivity(intent, result)
-            }
-        } catch (e: Exception) {
-            result.error("SHARE_FAILED", e.message, null)
+        // Verify file exists
+        guard FileManager.default.fileExists(atPath: imageURL.path) else {
+            result(FlutterError(code: "FILE_NOT_FOUND",
+                message: "Image file not found at path: \(imagePath)",
+            details: nil))
+            return
         }
+
+        // Load the image
+        guard let imageData = try? Data(contentsOf: imageURL),
+            let image = UIImage(data: imageData) else {
+                result(FlutterError(code: "INVALID_IMAGE",
+                    message: "Failed to load image",
+                details: nil))
+                return
+            }
+
+            // Method 1: Try Document Interaction Controller (direct to WhatsApp)
+            shareViaDocumentInteraction(image: image, imageURL: imageURL, result: result)
     }
 
     // --- SAVE TO GALLERY ---
