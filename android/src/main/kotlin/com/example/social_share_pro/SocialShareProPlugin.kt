@@ -56,6 +56,10 @@ class SocialShareProPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
 
                 shareToWhatsAppStatus(imagePath, result)
             }
+            "shareToInstagramDirect" -> {
+                 val text = call.argument<String>("text")
+                 shareToInstagramDirect(text, result)
+            }
             "saveToGallery" -> handleSaveToGallery(call, result)
             "isInstagramInstalled" -> result.success(isPackageInstalled(INSTAGRAM_PACKAGE))
             "isFacebookInstalled" -> result.success(isPackageInstalled(FACEBOOK_PACKAGE))
@@ -110,6 +114,29 @@ class SocialShareProPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
             startActivity(intent, result)
         } catch (e: Exception) {
             result.error("SHARE_FAILED", e.message, null)
+        }
+    }
+
+    private fun shareToInstagramDirect(text: String?, result: Result) {
+        try {
+            val intent = Intent(Intent.ACTION_SEND)
+            intent.setPackage("com.instagram.android")
+            intent.type = "text/plain"
+            
+            if (text != null && text.isNotEmpty()) {
+                intent.putExtra(Intent.EXTRA_TEXT, text)
+                intent.putExtra(Intent.EXTRA_SUBJECT, "Check this out")
+            } else {
+                result.error("INVALID_ARGUMENTS", "No message to share", null)
+                return
+            }
+            
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            startActivity(intent, result)
+            
+        } catch (e: Exception) {
+            e.printStackTrace()
+             result.error("SHARE_FAILED", "Failed to open Instagram Direct", null)
         }
     }
 
