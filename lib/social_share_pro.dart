@@ -25,6 +25,18 @@ class SocialSharePro {
     }
   }
 
+  /// Share to Instagram Direct
+  static Future<bool> shareToInstagramDirect({
+    required String text,
+  }) async {
+    try {
+      final result = await _channel.invokeMethod<bool>('shareToInstagramDirect', {'text': text});
+      return result ?? false;
+    } on PlatformException catch (_) {
+      return false;
+    }
+  }
+
   /// Share to Facebook Stories
   static Future<bool> shareToFacebookStories({
     required String stickerPath,

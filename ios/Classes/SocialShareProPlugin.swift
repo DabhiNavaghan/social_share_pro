@@ -16,6 +16,8 @@ public class SocialShareProPlugin: NSObject, FlutterPlugin, UIDocumentInteractio
         switch call.method {
         case "shareToInstagramStories":
             shareToInstagramStories(call: call, result: result)
+        case "shareToInstagramDirect":
+            shareToInstagramDirect(call: call, result: result)
         case "shareToFacebookStories":
             shareToFacebookStories(call: call, result: result)
         case "shareToWhatsAppStatus":
@@ -94,6 +96,109 @@ public class SocialShareProPlugin: NSObject, FlutterPlugin, UIDocumentInteractio
             result(success)
         }
     }
+
+    private func shareToInstagramDirect(call: FlutterMethodCall, result: @escaping FlutterResult) {
+    guard let args = call.arguments as? [String: Any],
+          let text = args["text"] as? String else {
+      result(FlutterError(code: "INVALID_ARGUMENTS", message: "Text is required", details: nil))
+      return
+    }
+    
+    // Check if Instagram app is installed using URL scheme
+    guard let instagramURL = URL(string: "instagram://") else {
+      result(FlutterError(code: "INVALID_URL", message: "Invalid Instagram URL", details: nil))
+      return
+    }
+    
+    if !UIApplication.shared.canOpenURL(instagramURL) {
+      result(FlutterError(code: "INSTAGRAM_NOT_INSTALLED", message: "Instagram app is not installed", details: nil))
+      return
+    }
+    
+    // URL encode the text
+    guard let encodedText = text.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) else {
+      result(FlutterError(code: "ENCODING_ERROR", message: "Failed to encode text", details: nil))
+      return
+    }
+
+    let instagramShareURL = URL(string: "instagram://sharesheet?text=\(encodedText)")
+    
+    if let shareURL = instagramShareURL {
+      UIApplication.shared.open(shareURL, options: [:]) { success in
+        if success {
+          result(true)
+        } else {
+
+          UIPasteboard.general.string = text
+          UIApplication.shared.open(instagramURL, options: [:]) { fallbackSuccess in
+            if fallbackSuccess {
+              DispatchQueue.main.async {
+                self.showToast(message: "Message copied - paste in Instagram")
+              }
+              result(true)
+            } else {
+              result(FlutterError(code: "FAILED_TO_OPEN", message: "Failed to open Instagram", details: nil))
+            }
+          }
+        }
+      }
+    } else {
+      // Fallback: Copy to clipboard and open Instagram
+      UIPasteboard.general.string = text
+      UIApplication.shared.open(instagramURL, options: [:]) { success in
+        if success {
+          DispatchQueue.main.async {
+            self.showToast(message: "Message copied - paste in Instagram")
+          }
+          result(true)
+        } else {
+          result(FlutterError(code: "FAILED_TO_OPEN", message: "Failed to open Instagram", details: nil))
+        }
+      }
+    }
+  }
+  
+  /// Show a simple toast-like message
+  private func showToast(message: String) {
+    guard let window = UIApplication.shared.keyWindow,
+          let rootViewController = window.rootViewController else {
+      return
+    }
+    
+    let toastLabel = UILabel()
+    toastLabel.backgroundColor = UIColor.black.withAlphaComponent(0.8)
+    toastLabel.textColor = UIColor.white
+    toastLabel.textAlignment = .center
+    toastLabel.font = UIFont.systemFont(ofSize: 14)
+    toastLabel.text = message
+    toastLabel.numberOfLines = 0
+    toastLabel.alpha = 0.0
+    toastLabel.layer.cornerRadius = 10
+    toastLabel.clipsToBounds = true
+    
+    let textSize = toastLabel.intrinsicContentSize
+    let labelWidth = min(textSize.width + 40, window.frame.width - 40)
+    let labelHeight = textSize.height + 20
+    
+    toastLabel.frame = CGRect(
+      x: (window.frame.width - labelWidth) / 2,
+      y: window.frame.height - labelHeight - 100,
+      width: labelWidth,
+      height: labelHeight
+    )
+    
+    window.addSubview(toastLabel)
+    
+    UIView.animate(withDuration: 0.3, animations: {
+      toastLabel.alpha = 1.0
+    }) { _ in
+      UIView.animate(withDuration: 0.3, delay: 2.0, options: .curveEaseOut, animations: {
+        toastLabel.alpha = 0.0
+      }) { _ in
+        toastLabel.removeFromSuperview()
+      }
+    }
+  }
     
     // MARK: - Facebook
     private func shareToFacebookStories(call: FlutterMethodCall, result: @escaping FlutterResult) {

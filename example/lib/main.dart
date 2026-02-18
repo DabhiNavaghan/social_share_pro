@@ -40,6 +40,12 @@ class _MyAppState extends State<MyApp> {
     }
   }
   
+  Future<void> _shareToInstagramDirect() async {
+     await SocialSharePro.shareToInstagramDirect(
+        text: "Hello from Social Share Pro!",
+     );
+  }
+  
   Future<void> _pickAndShareToWhatsApp() async {
     final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
     if (image != null) {
@@ -71,6 +77,10 @@ class _MyAppState extends State<MyApp> {
                ElevatedButton(
                  onPressed: _pickAndShareToWhatsApp,
                  child: const Text("Share to WhatsApp Status"),
+               ),
+               ElevatedButton(
+                 onPressed: _shareToInstagramDirect,
+                 child: const Text("Share to Instagram Direct"),
                ),
             ],
           ),
