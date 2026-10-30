@@ -1,5 +1,5 @@
-group = "com.example.social_share_pro"
-version = "1.0-SNAPSHOT"
+group = "dev.navaghandabhi.social_share_pro"
+version = "1.0.0"
 
 buildscript {
     ext.kotlin_version = "2.2.20"
@@ -25,7 +25,7 @@ apply plugin: "com.android.library"
 apply plugin: "kotlin-android"
 
 android {
-    namespace = "com.example.social_share_pro"
+    namespace = "dev.navaghandabhi.social_share_pro"
 
     compileSdk = 36
 
@@ -48,8 +48,6 @@ android {
     }
 
     dependencies {
-        testImplementation("org.jetbrains.kotlin:kotlin-test")
-        testImplementation("org.mockito:mockito-core:5.0.0")
     }
 
     testOptions {

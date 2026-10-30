@@ -1,4 +1,4 @@
-package com.example.social_share_pro
+package dev.navaghandabhi.social_share_pro
 
 import android.app.Activity
 import android.content.ComponentName

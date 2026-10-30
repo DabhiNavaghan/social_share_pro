@@ -380,19 +380,29 @@ public class SocialShareProPlugin: NSObject, FlutterPlugin, UIDocumentInteractio
              return
         }
         
-        PHPhotoLibrary.requestAuthorization(for: .addOnly) { status in
-            if status == .authorized || status == .limited {
-                PHPhotoLibrary.shared().performChanges({
-                    PHAssetChangeRequest.creationRequestForAsset(from: image)
-                }) { success, error in
-                    if success {
-                        result(true)
-                    } else {
-                        result(FlutterError(code: "SAVE_FAILED", message: error?.localizedDescription, details: nil))
-                    }
-                }
-            } else {
+        let save: (Bool) -> Void = { granted in
+            guard granted else {
                 result(FlutterError(code: "PERMISSION_DENIED", message: "Photo library permission denied", details: nil))
+                return
+            }
+            PHPhotoLibrary.shared().performChanges({
+                PHAssetChangeRequest.creationRequestForAsset(from: image)
+            }) { success, error in
+                if success {
+                    result(true)
+                } else {
+                    result(FlutterError(code: "SAVE_FAILED", message: error?.localizedDescription, details: nil))
+                }
+            }
+        }
+
+        if #available(iOS 14, *) {
+            PHPhotoLibrary.requestAuthorization(for: .addOnly) { status in
+                save(status == .authorized || status == .limited)
+            }
+        } else {
+            PHPhotoLibrary.requestAuthorization { status in
+                save(status == .authorized)
             }
         }
     }
