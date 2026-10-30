@@ -10,12 +10,18 @@ class SocialSharePro {
     String? backgroundImagePath,
     String? backgroundTopColor,
     String? backgroundBottomColor,
+    /// Facebook App ID. Required by Meta since Jan 2023 (`source_application`).
+    String? appId,
+    /// Link to attach to the story (e.g. the event page). Instagram decides whether to honour it.
+    String? contentUrl,
   }) async {
     final Map<String, dynamic> args = {
       'stickerPath': stickerPath,
       'backgroundImagePath': backgroundImagePath,
       'backgroundTopColor': backgroundTopColor,
       'backgroundBottomColor': backgroundBottomColor,
+      'appId': appId,
+      'contentUrl': contentUrl,
     };
     try {
       final result = await _channel.invokeMethod<bool>('shareToInstagramStories', args);

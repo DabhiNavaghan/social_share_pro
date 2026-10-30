@@ -1,11 +1,11 @@
 name: social_share_pro
 description: "A new Flutter plugin project."
-version: 0.0.1
+version: 1.0.0
 homepage:
 
 environment:
-  sdk: ^3.10.3
-  flutter: '>=3.3.0'
+  sdk: '>=3.0.0 <4.0.0'
+  flutter: '>=3.13.0'
 
 dependencies:
   flutter:

@@ -51,7 +51,8 @@ public class SocialShareProPlugin: NSObject, FlutterPlugin, UIDocumentInteractio
             return
         }
         
-        guard let urlScheme = URL(string: "instagram-stories://share?source_application=\(Bundle.main.bundleIdentifier ?? "")") else {
+        let appId = (args["appId"] as? String).flatMap { $0.isEmpty ? nil : $0 } ?? (Bundle.main.bundleIdentifier ?? "")
+        guard let urlScheme = URL(string: "instagram-stories://share?source_application=\(appId)") else {
             result(FlutterError(code: "URL_ERROR", message: "Invalid URL scheme", details: nil))
             return
         }
@@ -87,6 +88,12 @@ public class SocialShareProPlugin: NSObject, FlutterPlugin, UIDocumentInteractio
              }
         }
         
+        if let contentUrl = args["contentUrl"] as? String, !contentUrl.isEmpty,
+           var item = pasteboardItems.first {
+            item["com.instagram.sharedSticker.contentURL"] = contentUrl
+            pasteboardItems[0] = item
+        }
+
         let pasteboardOptions: [UIPasteboard.OptionsKey: Any] = [
             .expirationDate: Date().addingTimeInterval(60 * 5)
         ]
@@ -160,7 +167,9 @@ public class SocialShareProPlugin: NSObject, FlutterPlugin, UIDocumentInteractio
   
   /// Show a simple toast-like message
   private func showToast(message: String) {
-    guard let window = UIApplication.shared.keyWindow,
+    guard let windowScene = UIApplication.shared.connectedScenes
+            .first(where: { $0.activationState == .foregroundActive }) as? UIWindowScene,
+          let window = windowScene.windows.first(where: { $0.isKeyWindow }),
           let rootViewController = window.rootViewController else {
       return
     }
@@ -322,7 +331,9 @@ public class SocialShareProPlugin: NSObject, FlutterPlugin, UIDocumentInteractio
             return
         }
         
-        guard let controller = UIApplication.shared.delegate?.window??.rootViewController else {
+        guard let windowScene = UIApplication.shared.connectedScenes
+                .first(where: { $0.activationState == .foregroundActive }) as? UIWindowScene,
+              let controller = windowScene.windows.first(where: { $0.isKeyWindow })?.rootViewController else {
             result(FlutterError(code: "VIEW_ERROR", message: "Unable to find root view controller", details: nil))
             return
         }
@@ -369,8 +380,8 @@ public class SocialShareProPlugin: NSObject, FlutterPlugin, UIDocumentInteractio
              return
         }
         
-        PHPhotoLibrary.requestAuthorization { status in
-            if status == .authorized {
+        PHPhotoLibrary.requestAuthorization(for: .addOnly) { status in
+            if status == .authorized || status == .limited {
                 PHPhotoLibrary.shared().performChanges({
                     PHAssetChangeRequest.creationRequestForAsset(from: image)
                 }) { success, error in

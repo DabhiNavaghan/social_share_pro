@@ -98,6 +98,14 @@ class SocialShareProPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
                 setPackage(INSTAGRAM_PACKAGE)
                 putExtra("interactive_asset_uri", stickerUri)
 
+                val appId = call.argument<String>("appId")
+                if (!appId.isNullOrEmpty()) putExtra("source_application", appId)
+
+                val contentUrl = call.argument<String>("contentUrl")
+                if (!contentUrl.isNullOrEmpty()) putExtra("content_url", contentUrl)
+
+                Log.d("SocialSharePro", "Instagram story share -> source_application=$appId, content_url=$contentUrl")
+
                 val backgroundImagePath = call.argument<String>("backgroundImagePath")
                 if (backgroundImagePath != null) {
                     val backgroundUri = getUriForFile(backgroundImagePath)
